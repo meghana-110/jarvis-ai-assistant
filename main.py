@@ -1,5 +1,6 @@
 import os
 import openai
+from openai import OpenAI  # Modern OpenAI Client import
 import speech_recognition as sr
 import webbrowser
 import datetime
@@ -13,10 +14,15 @@ import subprocess
 import shutil
 import time
 import mediapipe as mp
+import mediapipe.python.solutions.hands as mp_hands  # Explicit import to fix the AttributeError
+import mediapipe.python.solutions.drawing_utils as mp_drawing
 import pywhatkit
 
-# Configuration - Perfectly safe placeholder text for GitHub tracking
-apikey = os.getenv('OPENAI_API_KEY') or 'your-api-key-here'
+# Securely grab the API key set in PyCharm environment configurations
+api_key_env = os.getenv('OPENAI_API_KEY')
+
+# Initialize the modern OpenAI client safely
+client = OpenAI(api_key=api_key_env) if api_key_env else None
 
 # Initialize text-to-speech engine
 engine = pyttsx3.init()
@@ -25,10 +31,8 @@ gesture_thread = None
 gesture_active = False
 listening_active = True  # Control variable for listening loop
 
-# Initialize Mediapipe Hands
-mp_hands = mp.solutions.hands
+# Initialize Mediapipe Hands using our safe explicit imports
 hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7)
-mp_drawing = mp.solutions.drawing_utils
 
 
 def say(text):
@@ -37,16 +41,23 @@ def say(text):
 
 
 def chat(query):
-    global chatStr
-    openai.api_key = apikey
+    global chatStr, client
     chatStr += f"You: {query}\nJarvis: "
+
+    if not client:
+        error_msg = "API Key missing. Please set OPENAI_API_KEY in PyCharm Environment Variables."
+        print(error_msg)
+        say("Please configure your API key in settings.")
+        return error_msg
+
     try:
-        response = openai.ChatCompletion.create(
+        # Modern v1.x+ Chat Completion API Syntax
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "system", "content": "You are a helpful AI assistant."},
                       {"role": "user", "content": query}]
         )
-        response_text = response["choices"][0]["message"]["content"].strip()
+        response_text = response.choices[0].message.content.strip()
         chatStr += response_text + "\n"
         say(response_text)
         return response_text
